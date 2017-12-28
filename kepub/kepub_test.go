@@ -23,13 +23,14 @@ func TestKepubify(t *testing.T) {
 	}
 
 	kepub := filepath.Join(td, "test1.kepub.epub")
-	kepubunp := filepath.Join(td, "test1.kepub.epub_unpacked")
 
 	err = Kepubify(filepath.Join(wd, "testdata", "books", "test1.epub"), kepub, false)
 	assert.Nil(t, err, "should not error when converting book")
 	assert.True(t, exists(kepub), "converted kepub should exist")
 
-	assert.Nil(t, UnpackEPUB(kepub, kepubunp, true), "should not error when unpacking converted kepub")
-	assert.True(t, exists(kepubunp), "unpacked kepub dir should exist")
-	assert.True(t, exists(filepath.Join(kepubunp, "META-INF", "container.xml")), "kepub should have a container.xml")
+	epubFiles, err := unpack(kepub)
+	assert.Nil(t, err, "should not error when unpacking converted kepub")
+	assert.True(t, epubFiles.Exists("META-INF/container.xml"), "kepub should have a container.xml")
+	c, _ := epubFiles.Read("mimetype")
+	assert.True(t, string(c) == "application/epub+zip", "kepub should have a correct mimetype file")
 }

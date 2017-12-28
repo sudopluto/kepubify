@@ -2,8 +2,6 @@ package kepub
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -12,26 +10,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/beevik/etree"
 )
-
-func cleanFiles(basepath string) error {
-	toRemove := []string{
-		"META-INF/calibre_bookmarks.txt",
-		"META-INF/iTunesMetadata.plist",
-		"META-INF/iTunesArtwork.plist",
-		"META-INF/.DS_STORE",
-		"META-INF/thumbs.db",
-		".DS_STORE",
-		"thumbs.db",
-		"iTunesMetadata.plist",
-		"iTunesArtwork.plist",
-	}
-
-	for _, file := range toRemove {
-		os.Remove(filepath.Join(basepath, file))
-	}
-
-	return nil
-}
 
 // processOPF cleans up extra calibre metadata from the content.opf file, and adds a reference to the cover image.
 func processOPF(opfText *string) error {
@@ -255,35 +233,35 @@ func cleanHTML(doc *goquery.Document) error {
 }
 
 // process processes the html of a content file in an ordinary epub and converts it into a kobo epub by adding kobo divs, kobo spans, smartening punctuation, and cleaning html.
-func process(content *string) error {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(*content))
+func process(content string) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if err := addDivs(doc); err != nil {
-		return err
+		return "", err
 	}
 
 	if err := addSpans(doc); err != nil {
-		return err
+		return "", err
 	}
 
 	if err := addKoboStyles(doc); err != nil {
-		return err
+		return "", err
 	}
 
 	if err := cleanHTML(doc); err != nil {
-		return err
+		return "", err
 	}
 
 	h, err := doc.Html()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if err := smartenPunctuation(&h); err != nil {
-		return err
+		return "", err
 	}
 
 	// Remove unicode replacement chars
@@ -293,7 +271,5 @@ func process(content *string) error {
 	h = strings.Replace(h, `<!-- ?xml version="1.0" encoding="utf-8"? -->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
 	h = strings.Replace(h, `<!--?xml version="1.0" encoding="utf-8"?-->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
 
-	*content = h
-
-	return nil
+	return h, nil
 }
