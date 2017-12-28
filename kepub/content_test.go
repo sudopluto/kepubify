@@ -138,7 +138,8 @@ func TestProcess(t *testing.T) {
 </body>
 </html>`
 
-	process(&h)
+	h, err := process(h)
+	assert.Nil(t, err, "there should not be an error")
 
 	hs := sha256.New()
 	hs.Write([]byte(h))
