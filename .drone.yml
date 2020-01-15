@@ -1,26 +1,36 @@
+---
 kind: pipeline
-name: kepub
 type: docker
+name: kepub
+
+platform:
+  os: linux
+  arch: amd64
 
 steps:
 - name: test-html
-  image: golang:1.13-buster
+  image: golang:1.13.6-buster
   commands:
-  - GO111MODULE=on go test -mod=readonly -run "^TestMod_" golang.org/x/net/html -v
-- name: test-kepub
-  image: golang:1.13-buster
+  - go test -mod=readonly -run "^TestMod_" golang.org/x/net/html -v
+  environment:
+    GO111MODULE: on
+
+- name: test
+  image: golang:1.13.6-buster
   commands:
-  - GO111MODULE=on go test -mod=readonly -v ./kepub
+  - go test -mod=readonly ./kepub -v
+  environment:
+    GO111MODULE: on
 
 trigger:
   event:
-    exclude: [promote]
+    exclude:
+    - promote
 
 ---
-
 kind: pipeline
-name: kepubify
 type: docker
+name: kepubify
 
 platform:
   os: linux
@@ -28,26 +38,31 @@ platform:
 
 steps:
 - name: test
-  image: golang:1.13-buster
+  image: golang:1.13.6-buster
   commands:
-  - GO111MODULE=on go test -mod=readonly -v .
+  - go test -mod=readonly . -v
+  environment:
+    GO111MODULE: on
+
 - name: run
-  image: golang:1.13-buster
+  image: golang:1.13.6-buster
   commands:
-  - GO111MODULE=on go run -mod=readonly . --help
+  - go run -mod=readonly . --help
+  environment:
+    GO111MODULE: on
+
+trigger:
+  event:
+    exclude:
+    - promote
 
 depends_on:
 - kepub
 
-trigger:
-  event:
-    exclude: [promote]
-
 ---
-
 kind: pipeline
+type: docker
 name: covergen
-type: docker
 
 platform:
   os: linux
@@ -55,23 +70,28 @@ platform:
 
 steps:
 - name: test
-  image: golang:1.13-buster
+  image: golang:1.13.6-buster
   commands:
-  - GO111MODULE=on go test -mod=readonly -v ./covergen
+  - go test -mod=readonly ./covergen -v
+  environment:
+    GO111MODULE: on
+
 - name: run
-  image: golang:1.13-buster
+  image: golang:1.13.6-buster
   commands:
-  - GO111MODULE=on go run -mod=readonly ./covergen --help
+  - go run -mod=readonly ./covergen --help
+  environment:
+    GO111MODULE: on
 
 trigger:
   event:
-    exclude: [promote]
+    exclude:
+    - promote
 
 ---
-
 kind: pipeline
+type: docker
 name: seriesmeta
-type: docker
 
 platform:
   os: linux
@@ -79,21 +99,27 @@ platform:
 
 steps:
 - name: test
-  image: golang:1.12-buster
+  image: golang:1.13.6-buster
   commands:
-  - GO111MODULE=on go test -mod=readonly -v ./seriesmeta
+  - go test -mod=readonly ./seriesmeta -v
+  environment:
+    GO111MODULE: on
+
 - name: run
-  image: golang:1.12-buster
+  image: golang:1.13.6-buster
   commands:
-  - GO111MODULE=on go run -mod=readonly ./seriesmeta --help
+  - go run -mod=readonly ./seriesmeta --help
+  environment:
+    GO111MODULE: on
 
 trigger:
   event:
-    exclude: [promote]
+    exclude:
+    - promote
 
 ---
-
 kind: pipeline
+type: docker
 name: release
 
 platform:
@@ -101,74 +127,217 @@ platform:
   arch: amd64
 
 steps:
-- name: cross-kepubify
-  image: golang:1.13-buster
-  commands:
-  - mkdir -p build
-  - GOLDFLAGS="-s -w -X main.version=${DRONE_TAG##v}"
-  - GO111MODULE=on GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-linux-64bit"       .
-  - GO111MODULE=on GOOS=linux   GOARCH=386   CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-linux-32bit"       .
-  - GO111MODULE=on GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-darwin-64bit"      .
-  - GO111MODULE=on GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-windows-64bit.exe" .
-  - GO111MODULE=on GOOS=windows GOARCH=386   CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-windows-32bit.exe" .
-- name: cross-covergen
-  image: golang:1.13-buster
-  commands:
-  - mkdir -p build
-  - GOLDFLAGS="-s -w -X main.version=${DRONE_TAG##v}"
-  - GO111MODULE=on GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/covergen-linux-64bit"  ./covergen
-  - GO111MODULE=on GOOS=linux   GOARCH=386   CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/covergen-linux-32bit"  ./covergen
-  - GO111MODULE=on GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/covergen-darwin-64bit" ./covergen
-  - GO111MODULE=on GOOS=windows GOARCH=386   CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/covergen-windows.exe"  ./covergen
-- name: cross-seriesmeta
-  image: dockercore/golang-cross:1.12.7
-  commands:
-  - dpkg --add-architecture i386
-  - apt update
-  - apt install -y libz-mingw-w64-dev zlib1g-dev:i386 zlib1g-dev libc6-dev-armhf-cross libc6-dev-i386 gcc-multilib libsqlite3-dev
-  - mkdir -p build
-  - GOLDFLAGS="-s -w -linkmode external -X main.version=${DRONE_TAG##v}"
-  - GO111MODULE=on GOOS=linux   GOARCH=amd64                           CGO_ENABLED=1 go build -ldflags "$${GOLDFLAGS}" -o "build/seriesmeta-linux-64bit"       ./seriesmeta
-  - GO111MODULE=on GOOS=linux   GOARCH=386   CC="gcc -m32"             CGO_ENABLED=1 go build -ldflags "$${GOLDFLAGS}" -o "build/seriesmeta-linux-32bit"       ./seriesmeta
-  - GO111MODULE=on GOOS=darwin  GOARCH=amd64 CC="o64-clang"            CGO_ENABLED=1 go build -ldflags "$${GOLDFLAGS}" -o "build/seriesmeta-darwin-64bit"      ./seriesmeta
-  - GO111MODULE=on GOOS=windows GOARCH=386   CC="i686-w64-mingw32-gcc" CGO_ENABLED=1 go build -ldflags "$${GOLDFLAGS} -extldflags -static" -o "build/seriesmeta-windows.exe" ./seriesmeta
-- name: debian
-  image: golang:1.13-buster
-  commands:
-  - GO111MODULE=on go install "github.com/goreleaser/nfpm/cmd/nfpm"
-  - 'VERSION="${DRONE_TAG##v}" nfpm pkg -f nfpm.yaml -t build/kepubify_${DRONE_TAG##v}_amd64.deb'
-  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
-- name: ls
-  image: golang:1.13-buster
-  commands:
-  - apt update
-  - apt install -y file
-  - file build/*
-  - ls -lah build
-  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
 - name: notes
-  image: golang:1.13-buster
+  image: golang:1.13.6-buster
   commands:
+  - mkdir -p build
   - git fetch --tags
-  - git log "$(git describe --tags --abbrev=0 HEAD~1)..HEAD" --oneline --format='%h %s' | tee -a notes.md
-  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
-- name: release
-  image: plugins/github-release
-  settings:
-    api_key: {from_secret: GITHUB_TOKEN}
-    title: ${DRONE_TAG}
-    note: notes.md
-    files: build/*
-    draft: true
-  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta, notes, debian]
+  - git describe --tags --always | tee build/version
+  - git log "$(git describe --tags --abbrev=0 HEAD~1)..HEAD" --oneline --format='%h %s' | tee build/notes.md
+
+- name: x-kepubify-linux-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - linux/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/kepubify-linux-64bit" .
+  environment:
+    GO111MODULE: on
+
+- name: x-kepubify-linux-386
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - linux/386
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/kepubify-linux-32bit" .
+  environment:
+    GO111MODULE: on
+
+- name: x-kepubify-linux-armv6
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-arm
+  command:
+  - --platforms
+  - linux/armv6
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/kepubify-linux-arm" .
+  environment:
+    GO111MODULE: on
+
+- name: x-kepubify-darwin-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-darwin
+  command:
+  - --platforms
+  - darwin/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/kepubify-darwin-64bit" .
+  environment:
+    GO111MODULE: on
+
+- name: x-kepubify-windows-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - windows/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/kepubify-windows-64bit.exe" .
+  environment:
+    GO111MODULE: on
+
+- name: x-kepubify-windows-386
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - windows/386
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/kepubify-windows-32bit.exe" .
+  environment:
+    GO111MODULE: on
+
+- name: x-covergen-linux-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - linux/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/covergen-linux-64bit" ./covergen
+  environment:
+    GO111MODULE: on
+
+- name: x-covergen-linux-386
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - linux/386
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/covergen-linux-32bit" ./covergen
+  environment:
+    GO111MODULE: on
+
+- name: x-covergen-linux-armv6
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-arm
+  command:
+  - --platforms
+  - linux/armv6
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/covergen-linux-arm" ./covergen
+  environment:
+    GO111MODULE: on
+
+- name: x-covergen-darwin-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-darwin
+  command:
+  - --platforms
+  - darwin/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/covergen-darwin-64bit" ./covergen
+  environment:
+    GO111MODULE: on
+
+- name: x-covergen-windows-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - windows/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/covergen-windows-64bit.exe" ./covergen
+  environment:
+    GO111MODULE: on
+
+- name: x-covergen-windows-386
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - windows/386
+  - --build-cmd
+  - go env; CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/covergen-windows-32bit.exe" ./covergen
+  environment:
+    GO111MODULE: on
+
+- name: x-seriesmeta-linux-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - linux/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/seriesmeta-linux-64bit" ./seriesmeta
+  environment:
+    GO111MODULE: on
+
+- name: x-seriesmeta-linux-386
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - linux/386
+  - --build-cmd
+  - go env; CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/seriesmeta-linux-32bit" ./seriesmeta
+  environment:
+    GO111MODULE: on
+
+- name: x-seriesmeta-linux-armv6
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-arm
+  command:
+  - --platforms
+  - linux/armv6
+  - --build-cmd
+  - go env; CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/seriesmeta-linux-arm" ./seriesmeta
+  environment:
+    GO111MODULE: on
+
+- name: x-seriesmeta-darwin-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-darwin
+  command:
+  - --platforms
+  - darwin/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/seriesmeta-darwin-64bit" ./seriesmeta
+  environment:
+    GO111MODULE: on
+
+- name: x-seriesmeta-windows-amd64
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - windows/amd64
+  - --build-cmd
+  - go env; CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/seriesmeta-windows-64bit.exe" ./seriesmeta
+  environment:
+    GO111MODULE: on
+
+- name: x-seriesmeta-windows-386
+  image: docker.elastic.co/beats-dev/golang-crossbuild:1.13.6-main
+  command:
+  - --platforms
+  - windows/386
+  - --build-cmd
+  - go env; CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(cat build/version)" -o "build/seriesmeta-windows-32bit.exe" ./seriesmeta
+  environment:
+    GO111MODULE: on
+
+- name: debian
+  image: golang:1.13.6-buster
+  commands:
+  - go install github.com/goreleaser/nfpm/cmd/nfpm
+  environment:
+    GO111MODULE: on
+
+- name: ls
+  image: golang:1.13.6-buster
+  commands:
+  - apt update && apt install -y file
+  - file build/*
+  - ls -lah build/*
 
 trigger:
-  ref:
-  - refs/tags/*
   event:
-    exclude: [promote]
+    exclude:
+    - promote
 
 depends_on:
+- kepub
 - kepubify
 - covergen
 - seriesmeta
+
+...
