@@ -133,6 +133,7 @@ steps:
   - mkdir -p build
   - git fetch --tags
   - git describe --tags --always | tee build/version
+  - git describe --tags --always | sed -E -e 's/^v([^-]*)$/\1/g' -e 's/^v([^-]*)-([^-]*)-(.*)$/\1~\2.\3/g' | tee build/debversion
   - git log "$(git describe --tags --abbrev=0 HEAD~1)..HEAD" --oneline --format='%h %s' | tee build/notes.md
 
 - name: x-kepubify-linux-amd64
@@ -319,6 +320,7 @@ steps:
   image: golang:1.13.6-buster
   commands:
   - go install github.com/goreleaser/nfpm/cmd/nfpm
+  - VERSION=$(cat build/debversion) nfpm pkg -f nfpm.yaml -t build/kepubify_$(cat build/debversion)_amd64.deb
   environment:
     GO111MODULE: on
 
@@ -328,6 +330,18 @@ steps:
   - apt update && apt install -y file
   - file build/*
   - ls -lah build/*
+
+- name: release
+  image: plugins/github-release
+  settings:
+    api_key:
+      from_secret: GITHUB_TOKEN
+    draft: true
+    files:
+    - build/kepubify*
+    - build/covergen*
+    - build/seriesmeta*
+    notes: build/notes.md
 
 trigger:
   event:

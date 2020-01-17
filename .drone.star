@@ -46,6 +46,7 @@ pipeline = [{
             "mkdir -p build",
             "git fetch --tags",
             "git describe --tags --always | tee build/version",
+            "git describe --tags --always | sed -E -e 's/^v([^-]*)$/\\1/g' -e 's/^v([^-]*)-([^-]*)-(.*)$/\\1~\\2.\\3/g' | tee build/debversion",
             "git log \"$(git describe --tags --abbrev=0 HEAD~1)..HEAD\" --oneline --format='%h %s' | tee build/notes.md",
         ]
     }] + [{
@@ -97,7 +98,7 @@ pipeline = [{
         },
         "commands": [
             "go install github.com/goreleaser/nfpm/cmd/nfpm",
-            # TODO: nfpm
+            "VERSION=$(cat build/debversion) nfpm pkg -f nfpm.yaml -t build/kepubify_$(cat build/debversion)_amd64.deb",
         ],
     }, {
         "name": "ls",
@@ -107,10 +108,26 @@ pipeline = [{
             "file build/*",
             "ls -lah build/*",
         ],
-    },
-    # TODO: GH release, conditions
-    ],
+    }, {
+        "name": "release",
+        "image": "plugins/github-release",
+        "settings": {
+            "api_key": {
+                "from_secret": "GITHUB_TOKEN",
+            },
+            "notes": "build/notes.md",
+            "draft": True,
+            "files": [
+                "build/kepubify*",
+                "build/covergen*",
+                "build/seriesmeta*",
+            ],
+        },
+    }],
     "trigger": {
+        #"ref": [
+        #    "refs/tags/v*",
+        #],
         "event": {
             "exclude": ["promote"],
         },
