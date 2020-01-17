@@ -110,7 +110,7 @@ func transform2koboDivs(doc *html.Node) {
 	}
 }
 
-var sentencere = regexp.MustCompile(`((?ms).*?[\.\!\?\:]['"”’“…]?\s*)`)
+var sentencere = regexp.MustCompile(`((?ms).*?[\.\!\?]['"”’“…]?\s+)`)
 
 func transform2koboSpans(doc *html.Node) {
 	// behaviour matches Kobo (checked with 3 books) as of 2020-01-12
@@ -145,12 +145,12 @@ func transform2koboSpans(doc *html.Node) {
 				}
 			}
 
-			// wrap each sentence in a span (if it isn't just whitespace) and add it back to the parent
+			// wrap each sentence in a span (don't wrap whitespace unless it is
+			// directly under a P tag [TODO: are there any other cases we wrap
+			// whitespace? ... I need to find a kepub like this]) and add it
+			// back to the parent.
 			for _, sentence := range sentences {
-				if allSpace(sentence) {
-					// if only spaces, preserve them, but don't wrap them with a span (issue #41, issue #21)
-					// this matches Kobo's behaviour better than the previous method of collapsing whitespace,
-					// and is less likely to cause future issues with book formatting
+				if allSpace(sentence) && cur.Parent.DataAtom != atom.P {
 					cur.Parent.InsertBefore(&html.Node{
 						Type: html.TextNode,
 						Data: sentence,
@@ -173,19 +173,29 @@ func transform2koboSpans(doc *html.Node) {
 		case html.ElementNode:
 			switch cur.DataAtom {
 			case atom.Img:
-				// increment the paragraph ommediately
+				// increment the paragraph immediately
 				para++
 				seg = 0
 				incParaNext = false
 
-				// add a span before the image
+				// add a span around the image
 				seg++
-				cur.Parent.InsertBefore(koboSpan(para, seg), cur)
+				s := koboSpan(para, seg)
+				s.AppendChild(&html.Node{
+					Type:      cur.Type,
+					DataAtom:  cur.DataAtom,
+					Namespace: cur.Namespace,
+					Data:      cur.Data,
+					Attr:      cur.Attr,
+					// note: img elements don't have children
+				})
+				cur.Parent.InsertBefore(s, cur)
+				cur.Parent.RemoveChild(cur)
 
 				fallthrough
 			case atom.Script, atom.Style, atom.Pre, atom.Audio, atom.Video:
 				continue // don't add spans to elements which should keep text as-is
-			case atom.P, atom.Ol, atom.Ul, atom.Table:
+			case atom.P, atom.Ol, atom.Ul, atom.Table, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
 				incParaNext = true // increment it only if it will have spans in it
 				fallthrough
 			default:

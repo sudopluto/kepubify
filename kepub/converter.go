@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"golang.org/x/net/html"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -29,6 +30,9 @@ type Converter struct {
 	// than working with strings)
 	find    [][]byte
 	replace [][]byte
+
+	// addSpans is for use by the kobotest command and should note be used elsewhere.
+	addSpans func(*html.Node)
 }
 
 // NewConverter creates a new Converter. By default, no options are applied.
@@ -42,26 +46,15 @@ func NewConverterWithOptions(opts ...ConverterOption) *Converter {
 	for _, f := range opts {
 		f(c)
 	}
+	c.addSpans = transform2koboSpans
 	return c
 }
 
 // Convert converts the dir as the root of an EPUB.
-func (c *Converter) Convert(dir string) {
-	panic("not implemented")
-}
-
-// ConvertEPUB converts an EPUB file.
-func (c *Converter) ConvertEPUB(epub, kepub string) error {
-	td, err := ioutil.TempDir("", "kepubify")
-	if err != nil {
-		return fmt.Errorf("create temp dir: %w", err)
-	}
-	defer os.RemoveAll(td)
-
-	dir := filepath.Join(td, "unpacked")
-
-	if err := UnpackEPUB(epub, dir); err != nil {
-		return fmt.Errorf("unpack epub: %w", err)
+func (c *Converter) Convert(dir string) error {
+	if _, err := FindOPF(dir); err != nil {
+		// sanity check to help guard against mistakes (i.e. we don't want to mess up someone's files if they make a mistake with the path)
+		return fmt.Errorf("not an epub: %s", dir)
 	}
 
 	if err := c.transformAllContentParallel(dir); err != nil {
@@ -85,6 +78,27 @@ func (c *Converter) ConvertEPUB(epub, kepub string) error {
 
 	if err := c.transformEPUB(dir); err != nil {
 		return fmt.Errorf("transform epub: %w", err)
+	}
+
+	return nil
+}
+
+// ConvertEPUB converts an EPUB file.
+func (c *Converter) ConvertEPUB(epub, kepub string) error {
+	td, err := ioutil.TempDir("", "kepubify")
+	if err != nil {
+		return fmt.Errorf("create temp dir: %w", err)
+	}
+	defer os.RemoveAll(td)
+
+	dir := filepath.Join(td, "unpacked")
+
+	if err := UnpackEPUB(epub, dir); err != nil {
+		return fmt.Errorf("unpack epub: %w", err)
+	}
+
+	if err := c.Convert(dir); err != nil {
+		return err
 	}
 
 	if err := PackEPUB(dir, kepub); err != nil {
