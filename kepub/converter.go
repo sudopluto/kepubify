@@ -136,14 +136,13 @@ func (c *Converter) transformAllContentParallel(dir string) error {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		g.Go(func() error {
 			for fn := range contentFiles {
-				f, err := os.OpenFile(fn, os.O_RDWR, 0)
-				if err != nil {
+				if f, err := os.OpenFile(fn, os.O_RDWR, 0); err != nil {
 					return fmt.Errorf("open content file %#v: %w", fn, err)
-				}
-				defer f.Close()
-
-				if err := c.TransformContentDocFile(f); err != nil {
+				} else if err := c.TransformContentDocFile(f); err != nil {
+					f.Close()
 					return fmt.Errorf("transform content file %#v: %w", fn, err)
+				} else {
+					f.Close()
 				}
 
 				select {
@@ -317,12 +316,9 @@ const cssHyphenate = `* {
     -moz-hyphens: auto;
     hyphens: auto;
 
-    -webkit-hyphenate-after: 3;
-    -webkit-hyphenate-before: 3;
-    -webkit-hyphenate-lines: 2;
-    hyphenate-after: 3;
-    hyphenate-before: 3;
-    hyphenate-lines: 2;
+    -webkit-hyphenate-limit-after: 3;
+    -webkit-hyphenate-limit-before: 3;
+    -webkit-hyphenate-limit-lines: 2;
 }
 
 h1, h2, h3, h4, h5, h6, td {

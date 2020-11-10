@@ -1,3 +1,4 @@
+// Command seriesmeta updates series metadata for EPUB/KEPUB books in the Kobo database.
 package main
 
 import (
@@ -13,9 +14,8 @@ import (
 	"strings"
 
 	"github.com/beevik/etree"
-	"github.com/geek1011/koboutils/v2/kobo"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/mattn/go-zglob"
+	"github.com/pgaskin/koboutils/v2/kobo"
 	"github.com/spf13/pflag"
 )
 
@@ -39,6 +39,8 @@ func main() {
 		}
 		return
 	}
+
+	fmt.Println("Note: You might be interested in NickelSeries (https://go.pgaskin.net/kobo/ns), which will automatically import series and subtitle metadata along with the book itself.")
 
 	fmt.Println("Finding kobo")
 	var kp string
@@ -172,7 +174,9 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 				UPDATE content
 				SET
 					Series       = (SELECT Series       FROM _seriesmeta WHERE ImageId = new.ImageId),
-					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId)
+					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId),
+					/* Get the SeriesID from books from the Kobo Store (WorkId NOT NULL) where the series name matches, otherwise just use the series name as the SeriesID (https://www.mobileread.com/forums/showthread.php?p=3959768) */
+					SeriesID     = coalesce((SELECT SeriesID FROM content WHERE Series = (SELECT Series FROM _seriesmeta WHERE ImageId = new.ImageId) AND WorkId NOT NULL AND SeriesID NOT NULL AND WorkId != "" AND SeriesID != "" LIMIT 1), (SELECT Series FROM _seriesmeta WHERE ImageId = new.ImageId))
 				WHERE ImageId = new.ImageId;
 				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
 			END;
@@ -189,7 +193,9 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 				UPDATE content
 				SET
 					Series       = (SELECT Series       FROM _seriesmeta WHERE ImageId = new.ImageId),
-					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId)
+					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId),
+					/* Get the SeriesID from books from the Kobo Store (WorkId NOT NULL) where the series name matches, otherwise just use the series name as the SeriesID (https://www.mobileread.com/forums/showthread.php?p=3959768) */
+					SeriesID     = coalesce((SELECT SeriesID FROM content WHERE Series = (SELECT Series FROM _seriesmeta WHERE ImageId = new.ImageId) AND WorkId NOT NULL AND SeriesID NOT NULL AND WorkId != "" AND SeriesID != "" LIMIT 1), (SELECT Series FROM _seriesmeta WHERE ImageId = new.ImageId))
 				WHERE ImageId = new.ImageId;
 				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
 			END;
@@ -216,7 +222,9 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 				UPDATE content
 				SET
 					Series       = new.Series,
-					SeriesNumber = new.SeriesNumber
+					SeriesNumber = new.SeriesNumber,
+					/* Get the SeriesID from books from the Kobo Store (WorkId NOT NULL) where the series name matches, otherwise just use the series name as the SeriesID (https://www.mobileread.com/forums/showthread.php?p=3959768) */
+					SeriesID     = coalesce((SELECT SeriesID FROM content WHERE Series = new.Series AND WorkId NOT NULL AND SeriesID NOT NULL AND WorkId != "" AND SeriesID != "" LIMIT 1), new.Series)
 				WHERE ImageId = new.ImageId;
 				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
 			END;
@@ -232,7 +240,9 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 				UPDATE content
 				SET
 					Series       = new.Series,
-					SeriesNumber = new.SeriesNumber
+					SeriesNumber = new.SeriesNumber,
+					/* Get the SeriesID from books from the Kobo Store (WorkId NOT NULL) where the series name matches, otherwise just use the series name as the SeriesID (https://www.mobileread.com/forums/showthread.php?p=3959768) */
+					SeriesID     = coalesce((SELECT SeriesID FROM content WHERE Series = new.Series AND WorkId NOT NULL AND SeriesID NOT NULL AND WorkId != "" AND SeriesID != "" LIMIT 1), new.Series)
 				WHERE ImageId = new.ImageId;
 				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
 			END;
@@ -249,7 +259,16 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 // UpdateSeries updates the series metadata for all epub books on the device. All
 // errors from individual books are returned through the log callback.
 func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series string, index float64, err error)) error {
-	epubs, err := zglob.Glob(filepath.Join(k.Path, "**/*.epub"))
+	var epubs []string
+	err := filepath.Walk(k.Path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("error scanning %q: %w", path, err)
+		}
+		if !info.IsDir() && strings.EqualFold(filepath.Ext(path), ".epub") {
+			epubs = append(epubs, path)
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}

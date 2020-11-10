@@ -17,9 +17,9 @@
             <div class="description">Converts EPUBs to KEPUBs</div>
         </div>
         <div class="buttons">
-            <a href="https://github.com/geek1011/kepubify/releases" class="button">Changelog</a>
-            <a href="https://github.com/geek1011/kepubify" class="button">Source Code</a>
-            <a target="_blank" href="https://github.com/geek1011/kepubify/releases/latest" id="download" class="button primary">Download</a>
+            <a href="https://github.com/pgaskin/kepubify/releases" class="button">Changelog</a>
+            <a href="https://github.com/pgaskin/kepubify" class="button">Source Code</a>
+            <a target="_blank" href="https://github.com/pgaskin/kepubify/releases/latest" id="download" class="button primary">Download</a>
         </div>
         <div class="clearfix"></div>
     </div>
@@ -37,10 +37,10 @@
                 <li>Comprehensive test suite</li>
                 <li>Optionally pre-generate covers (can also stretch it to a specific aspect ratio)</li>
                 <li>Optionally update Kobo series metadata (even before the book is imported)</li>
-                <li><b><a href="https://github.com/geek1011/kepubify/releases/latest">Covergen</a>: </b>Optionally pre-generate covers (can also stretch it to a specific aspect ratio)</li>
-                <li><b><a href="https://github.com/geek1011/kepubify/releases/latest">Seriesmeta</a>: </b>Optionally update Kobo series metadata (even before the book is imported)</li>
+                <li><b><a href="https://github.com/pgaskin/kepubify/releases/latest">Covergen</a>: </b>Optionally pre-generate covers (can also stretch it to a specific aspect ratio)</li>
+                <li><b><a href="https://github.com/pgaskin/kepubify/releases/latest">Seriesmeta</a>: </b>Optionally update Kobo series metadata (even before the book is imported)</li>
             </ul>
-            <a style="display:none;font-size:12px;" target="_blank" id="other-platforms" href="https://github.com/geek1011/kepubify/releases/latest">Download for other platforms</a>
+            <a style="display:none;font-size:12px;" target="_blank" id="other-platforms" href="https://github.com/pgaskin/kepubify/releases/latest">Download for other platforms</a>
         </div>
         <div class="screenshot">
             <img id="screenshot" src="kepubify-windows.gif">
@@ -101,6 +101,8 @@ Output Options:
   -o, --output string      [>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with
                            nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)
       --calibre            Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
+  -x, --copy strings       Copy files with the specified extension (with a leading period) to the output unchanged (no effect if the filename ends up the
+                           same)
 
 Conversion Options:
       --smarten-punctuation        Smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
@@ -112,8 +114,8 @@ Conversion Options:
 
 Links:
   Website      - https://pgaskin.net/kepubify
-  Source Code  - https://github.com/geek1011/kepubify
-  Bugs/Support - https://github.com/geek1011/kepubify/issues
+  Source Code  - https://github.com/pgaskin/kepubify
+  Bugs/Support - https://github.com/pgaskin/kepubify/issues
   MobileRead   - http://mr.gd/forums/showthread.php?t=295287</pre>
         </div>
     </div>
@@ -183,14 +185,20 @@ Links:
                 <br>
                 <tt>kepubify --update --inplace --calibre /path/to/calibre/library/</tt>
             </p>
+
+            <p>
+                <b>To convert a folder of books directly on to a Kobo eReader, while simply copying PDF files</b>:
+                <br>
+                <tt>kepubify --output /path/to/kobo/kepubify --update --copy .pdf /path/to/books/</tt>
+            </p>
         </div>
     </div>
     <div class="section">
         <div class="name">Series metadata</div>
         <div class="text">
             <p>
-                On Linux and Windows, you can update the series metadata on the Kobo using seriesmeta. Seriesmeta is available
-                <a href="https://github.com/geek1011/kepubify/releases/latest">here</a>. It will automatically detect your Kobo when you run it.
+                You can update the series metadata on the Kobo using seriesmeta. Seriesmeta is available
+                <a href="https://github.com/pgaskin/kepubify/releases/latest">here</a>. It will automatically detect your Kobo when you run it.
                 Seriesmeta doesn't conflict with Calibre, and works on both EPUB and KEPUB books.
             </p>
             <p>
@@ -214,7 +222,7 @@ Arguments:
   kobo_path is the path to the Kobo eReader. If not specified, seriesmeta will
   try to automatically detect the Kobo.</pre>
             <p>
-                See <a href="https://github.com/geek1011/kepubify/blob/master/README.md#seriesmeta">here</a> for more details.
+                See <a href="https://github.com/pgaskin/kepubify/blob/master/README.md#seriesmeta">here</a> for more details.
             </p>
         </div>
     </div>
@@ -223,7 +231,7 @@ Arguments:
         <div class="text">
             <p>
                 You can pre-generate/re-generate cover images using covergen. Covergen is available
-                <a href="https://github.com/geek1011/kepubify/releases/latest">here</a>. It will automatically detect your Kobo when you run it.
+                <a href="https://github.com/pgaskin/kepubify/releases/latest">here</a>. It will automatically detect your Kobo when you run it.
                 You cam use covergen without using kepubify (i.e. it works with EPUB books and won't conflict with Calibre).
             </p>
             <p>
@@ -244,7 +252,7 @@ Arguments:
   kobo_path is the path to the Kobo eReader. If not specified, covergen will try
   to automatically detect the Kobo.</pre>
             <p>
-                See <a href="https://github.com/geek1011/kepubify/blob/master/README.md#covergen">here</a> for more details.
+                See <a href="https://github.com/pgaskin/kepubify/blob/master/README.md#covergen">here</a> for more details.
             </p>
         </div>
     </div>
@@ -279,8 +287,8 @@ Arguments:
         <div class="text">
             <p>
                 If you find any issues or have any questions, please
-                <a href="https://github.com/geek1011/kepubify/issues">report them here</a>, or send me an email at
-                <tt>geek1011 (at) outlook.com</tt>. Include the kepubify version, the operating system you are using, and if
+                <a href="https://github.com/pgaskin/kepubify/issues">report them here</a>, or send me an email at
+                <tt>patrick (at) pgaskin (dot) net</tt>. Include the kepubify version, the operating system you are using, and if
                 possible, the book which you are having problems with. You can find the version by typing:
                 <tt>kepubify --version</tt>.
             </p>
@@ -322,7 +330,7 @@ Arguments:
 
         var getRelease = function (onSuccess, onError) {
             var req;
-            var url = "https://api.github.com/repos/geek1011/kepubify/releases/latest";
+            var url = "https://api.github.com/repos/pgaskin/kepubify/releases/latest";
             //return;
             if (XMLHttpRequest) {
                 req = new XMLHttpRequest();
@@ -375,9 +383,9 @@ Arguments:
                 urls[release.assets[i].name] = release.assets[i].browser_download_url;
             }
 
-            if (os == "Windows" && urls["kepubify-windows-32bit.exe"]) {
+            if (os == "Windows" && urls["kepubify-windows-64bit.exe"]) {
                 otherPlatforms.style.display = "block";
-                button.href = urls["kepubify-windows-32bit.exe"];
+                button.href = urls["kepubify-windows-64bit.exe"];
                 button.target = "_blank";
                 button.innerHTML = "Download for Windows";
             } else if (os == "Linux" && urls["kepubify-linux-64bit"]) {
